@@ -18,20 +18,13 @@ int Process::Pid() const { return pid_; }
 
 // TODO: Return this process's CPU utilization
 float Process::CpuUtilization() {
-  // Process start time (time since the process started)
-  long processStartTime = LinuxParser::UpTime(pid_);
-
-  // Current time (current system uptime)
-  long currentTime = LinuxParser::UpTime();
-
-  // Calculate total time the process has been running
-  long totalTime = currentTime - processStartTime;
+  float totalJiffies = LinuxParser::Jiffies();
 
   // Calculate CPU utilization
-  if (totalTime > 0) {
+  if (totalJiffies > 0) {
     // Active time for the process
     float activeTime = LinuxParser::ActiveJiffies(pid_);
-    CpuUtilization((activeTime / sysconf(_SC_CLK_TCK)) / totalTime);
+    CpuUtilization(activeTime / totalJiffies);
 
     return cpuUtilization_;
   } else {
