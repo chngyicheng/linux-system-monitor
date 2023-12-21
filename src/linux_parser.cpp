@@ -112,23 +112,24 @@ long LinuxParser::Jiffies() {
     std::getline(stream, line);
     std::istringstream linestream(line);
     linestream >> cpu;
-    if (cpu == "cpu:") {
+    if (cpu == "cpu") {
       std::vector<std::string> values(std::istream_iterator<std::string>{linestream}, std::istream_iterator<std::string>());
+      // Ensure there are enough values to extract
+      if (values.size() >= kIOwait_ + 1) {
+        // Calculate the total jiffies
+        long user       = std::stol(values[kUser_]);
+        long nice       = std::stol(values[kNice_]);
+        long system     = std::stol(values[kSystem_]);
+        long irq        = std::stol(values[kIRQ_]);
+        long softirq    = std::stol(values[kSoftIRQ_]);
+        long steal      = std::stol(values[kSteal_]);
+        long guest      = std::stol(values[kGuest_]);
+        long guest_nice = std::stol(values[kGuestNice_]);
+        long idle       = std::stol(values[kIdle_]);
+        long iowait     = std::stol(values[kIOwait_]);
 
-      // Calculate the active jiffies
-      long user       = std::stol(values[kUser_]);
-      long nice       = std::stol(values[kNice_]);
-      long system     = std::stol(values[kSystem_]);
-      long irq        = std::stol(values[kIRQ_]);
-      long softirq    = std::stol(values[kSoftIRQ_]);
-      long steal      = std::stol(values[kSteal_]);
-      long guest      = std::stol(values[kGuest_]);
-      long guest_nice = std::stol(values[kGuestNice_]);
-      long idle       = std::stol(values[kIdle_]);
-      long iowait     = std::stol(values[kIOwait_]);
-
-      long total_jiffies = user + nice + system + irq + softirq + steal + guest + guest_nice + idle + iowait;
-      return total_jiffies;
+        return user + nice + system + irq + softirq + steal + guest + guest_nice + idle + iowait;
+      }
     }
   }
   return 0;
@@ -137,19 +138,32 @@ long LinuxParser::Jiffies() {
 // TODO: Read and return the number of active jiffies for a PID
 // REMOVE: [[maybe_unused]] once you define the function
 long LinuxParser::ActiveJiffies(int pid) {
-  string pid_, comm_, state_, ppid_, pgrp_, session_, tty_nr_, tpgid_, flags_, minflt_, cminflt_, majflt_, cmajflt_, utime_, stime_, cutime_, cstime_;
-  string line, pid_string = "/" + std::to_string(pid);;
+  string pid_, comm_, state_, ppid_, pgrp_, session_, tty_nr_, tpgid_, flags_, minflt_, cminflt_, majflt_, cmajflt_, utime_, stime_, cutime_, cstime_, discard;
+  string line, pid_string = "/" + std::to_string(pid);
   std::ifstream stream(kProcDirectory + pid_string + kStatFilename);
   if (stream.is_open()) {
     std::getline(stream, line);
     std::istringstream linestream(line);
+
+    // Put the information from linestream into strings
     linestream >> pid_ >> comm_ >> state_ >> ppid_ >> pgrp_ >> session_ >> tty_nr_ >> tpgid_ >> flags_ >> minflt_ >> cminflt_ >> majflt_ >> cmajflt_ >> utime_ >> stime_ >> cutime_ >> cstime_;
-    long utime = std::stol(utime_);
-    long stime = std::stol(stime_);
+    long utime  = std::stol(utime_);
+    long stime  = std::stol(stime_);
     long cutime = std::stol(cutime_);
     long cstime = std::stol(cstime_);
+    
+    // Skip the remaining fields
+    for (int i = 0; i < 7; ++i) {
+      linestream >> discard;
+    }
 
-    long active_jiffies = utime + stime + cutime + cstime;
+    // Total active jiffies
+    long total_jiffies = utime + stime + cutime + cstime;
+    long process_uptime = LinuxParser::UpTime(pid);
+
+    // Calculate the active jiffies during the process uptime
+    long active_jiffies = (process_uptime * sysconf(_SC_CLK_TCK)) - total_jiffies;
+
     return active_jiffies;
   }
   return 0;
@@ -164,7 +178,7 @@ long LinuxParser::ActiveJiffies() {
     std::getline(stream, line);
     std::istringstream linestream(line);
     linestream >> cpu;
-    if (cpu == "cpu:") {
+    if (cpu == "cpu") {
       std::vector<std::string> values(std::istream_iterator<std::string>{linestream}, std::istream_iterator<std::string>());
 
       // Calculate the active jiffies
@@ -334,8 +348,6 @@ string LinuxParser::User(int pid) {
     std::getline(linestream, username, ':'); // Get the username field
     std::getline(linestream, passwd, ':'); // Get the password field
     std::getline(linestream, uidStr, ':'); // Get the UID field
-
-    uidStr = uidStr.substr(1);     // Remove the first character (the colon)
 
     if (uidStr == LinuxParser::Uid(pid)) {
         return username;

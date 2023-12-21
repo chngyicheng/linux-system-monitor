@@ -11,28 +11,48 @@ using std::string;
 using std::to_string;
 using std::vector;
 
+Process::Process(int pid):pid_{pid} {}
+
 // TODO: Return this process's ID
-int Process::Pid() { return getpid(); }
+int Process::Pid() const { return pid_; }
 
 // TODO: Return this process's CPU utilization
 float Process::CpuUtilization() {
-  return static_cast<float>(LinuxParser::ActiveJiffies(getpid())) / LinuxParser::Jiffies();
+  // Process start time (time since the process started)
+  long processStartTime = LinuxParser::UpTime(pid_);
+
+  // Current time (current system uptime)
+  long currentTime = LinuxParser::UpTime();
+
+  // Calculate total time the process has been running
+  long totalTime = currentTime - processStartTime;
+
+  // Calculate CPU utilization
+  if (totalTime > 0) {
+    // Active time for the process
+    float activeTime = LinuxParser::ActiveJiffies(pid_);
+    CpuUtilization((activeTime / sysconf(_SC_CLK_TCK)) / totalTime);
+
+    return cpuUtilization_;
+  } else {
+    return 0.0; // Avoid division by zero
+  }
 }
 
 // TODO: Return the command that generated this process
-string Process::Command() { return LinuxParser::Command(getpid()); }
+string Process::Command() { return LinuxParser::Command(pid_); }
 
 // TODO: Return this process's memory utilization
-string Process::Ram() { return LinuxParser::Ram(getpid()); }
+string Process::Ram() { return LinuxParser::Ram(pid_); }
 
 // TODO: Return the user (name) that generated this process
-string Process::User() { return LinuxParser::User(getpid()); }
+string Process::User() { return LinuxParser::User(pid_); }
 
 // TODO: Return the age of this process (in seconds)
-long int Process::UpTime() { return LinuxParser::UpTime(getpid()); }
+long int Process::UpTime() { return LinuxParser::UpTime(pid_); }
 
 // TODO: Overload the "less than" comparison operator for Process objects
 // REMOVE: [[maybe_unused]] once you define the function
 bool Process::operator<(Process const& a) const {
-  return this->cpuUtilization_ < a.cpuUtilization_;
+  return this->cpuUtilization_ > a.cpuUtilization_;
 }

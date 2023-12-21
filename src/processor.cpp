@@ -3,27 +3,29 @@
 
 // TODO: Return the aggregate CPU utilization
 float Processor::Utilization() {
-  std::string uptime, idletime;
-  std::string line, cpu;
-  int user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
-  int total_time, total_time_diff, idle_time, idle_time_diff;
-  std::ifstream stream(LinuxParser::kProcDirectory + LinuxParser::kStatFilename);
-  if (stream.is_open()) {
-    std::getline(stream, line);
-    std::istringstream linestream(line);
-    linestream >> cpu >> user >> nice >> system >> idle >> iowait >> irq >> softirq >> steal >> guest >> guest_nice;
-    total_time = user + nice + system + idle + iowait + irq + softirq + steal + guest + guest_nice;
-    idle_time = idle + iowait;
+  // Get CPU utilization values
+  std::vector<std::string> cpuValues = LinuxParser::CpuUtilization();
 
-    static int prev_total_time = 0;
-    static int prev_idle_time = 0;
-    total_time_diff = total_time - prev_total_time;
-    idle_time_diff = idle_time - prev_idle_time;
+  // Ensure there are enough values to calculate utilization
+  if (cpuValues.size() >= LinuxParser::kSteal_ + 1) {
+    // Calculate the total active and total jiffies
+    float activeJiffies = std::stof(cpuValues[LinuxParser::kUser_]) +
+                          std::stof(cpuValues[LinuxParser::kNice_]) +
+                          std::stof(cpuValues[LinuxParser::kSystem_]) +
+                          std::stof(cpuValues[LinuxParser::kIRQ_]) +
+                          std::stof(cpuValues[LinuxParser::kSoftIRQ_]) +
+                          std::stof(cpuValues[LinuxParser::kSteal_]) +
+                          std::stof(cpuValues[LinuxParser::kGuest_]) +
+                          std::stof(cpuValues[LinuxParser::kGuestNice_]);
 
-    double cpu_utilization = (total_time_diff - idle_time_diff) / static_cast<double>(total_time_diff) * 100;
+    float totalJiffies = activeJiffies +
+                          std::stof(cpuValues[LinuxParser::kIdle_]) +
+                          std::stof(cpuValues[LinuxParser::kIOwait_]);
 
-    prev_total_time = total_time;
-    prev_idle_time = idle_time;
+    // Calculate CPU utilization as a percentage
+    return activeJiffies / totalJiffies;
   }
-  return 0;
+
+  // Return 0 if there was an issue getting CPU utilization
+  return 0.0;
 }
