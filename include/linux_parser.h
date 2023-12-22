@@ -35,9 +35,9 @@ std::string OperatingSystem();
 std::string Kernel();
 
 template <typename T>
-T findValueByKey();
+T findValueByKey(std::string const &keyFilter, std::string const &fileName);
 template <typename T>
-T getValueOfFile();
+T getValueOfFile(std::string const &filename);
 
 // CPU
 enum CPUStates {
